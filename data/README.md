@@ -1,12 +1,22 @@
 # Data
 
-This directory is gitignored except for this file.
+This directory is gitignored except for this file and the committed sample
+`co2_sample.csv`.
 
-## Primary demo series (no download needed)
+## Committed sample (no download needed)
 
-The headline demo uses the Mauna Loa atmospheric CO2 record that ships with
-statsmodels (`statsmodels.datasets.co2`). It loads offline, so the tests,
-`scripts/forecast.py`, and the demo notebook require no files here.
+`co2_sample.csv` is the full monthly Mauna Loa atmospheric CO2 record, 526
+observations from 1958-03 to 2001-12, as a two-column `date,co2` CSV. It is a
+carved subset of the public NOAA record that ships with statsmodels
+(`statsmodels.datasets.co2`), resampled to a regular monthly grid. It is a
+carved public subset, not synthetic, and it is license clean.
+
+The CLI (`scripts/forecast.py`), the tests, and the demo notebook all load this
+file and run fully offline. Regenerate it from statsmodels with:
+
+```
+python scripts/make_sample.py
+```
 
 ## Optional FRED series
 
