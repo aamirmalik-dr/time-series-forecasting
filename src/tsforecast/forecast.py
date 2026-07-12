@@ -5,8 +5,42 @@ from __future__ import annotations
 import warnings
 from dataclasses import dataclass, field
 
+import numpy as np
 import pandas as pd
+from statsmodels.stats.diagnostic import acorr_ljungbox
 from statsmodels.tsa.statespace.sarimax import SARIMAX, SARIMAXResults
+
+
+@dataclass(frozen=True)
+class ResidualDiagnostics:
+    """Summary statistics of a fitted model's residuals.
+
+    Attributes:
+        mean: Mean of the residuals. Should be close to zero for a good fit.
+        std: Standard deviation of the residuals.
+        ljung_box_stat: Ljung-Box Q statistic at the tested lag.
+        ljung_box_pvalue: Ljung-Box p-value. Values above 0.05 indicate the
+            residuals are indistinguishable from white noise at the tested lag.
+        lags: Number of lags used for the Ljung-Box test.
+    """
+
+    mean: float
+    std: float
+    ljung_box_stat: float
+    ljung_box_pvalue: float
+    lags: int
+
+    def is_white_noise(self, alpha: float = 0.05) -> bool:
+        """Whether the residuals pass the Ljung-Box white-noise test.
+
+        Args:
+            alpha: Significance level for the test.
+
+        Returns:
+            True if the Ljung-Box p-value exceeds ``alpha`` (no significant
+            autocorrelation detected).
+        """
+        return self.ljung_box_pvalue > alpha
 
 
 @dataclass(frozen=True)
@@ -117,3 +151,35 @@ class SarimaxForecaster:
             AIC as a float.
         """
         return float(self.results.aic)
+
+    def residual_diagnostics(self, lags: int = 12) -> ResidualDiagnostics:
+        """Compute white-noise diagnostics on the fitted model's residuals.
+
+        Args:
+            lags: Number of lags for the Ljung-Box test. For monthly data with
+                yearly seasonality, 12 is a natural choice.
+
+        Returns:
+            A :class:`ResidualDiagnostics` with residual mean, standard
+            deviation, and the Ljung-Box statistic and p-value.
+
+        Raises:
+            RuntimeError: If the model has not been fitted yet.
+        """
+        results = self.results
+        resid = np.asarray(results.resid, dtype=float)
+        # Drop the state-space startup residuals (burn-in plus any diffuse
+        # initialization); they reflect filter initialization, not model fit.
+        burn = int(getattr(results, "loglikelihood_burn", 0)) + int(
+            getattr(results, "nobs_diffuse", 0)
+        )
+        resid = resid[burn:]
+        resid = resid[np.isfinite(resid)]
+        lb = acorr_ljungbox(resid, lags=[lags], return_df=True)
+        return ResidualDiagnostics(
+            mean=float(np.mean(resid)),
+            std=float(np.std(resid)),
+            ljung_box_stat=float(lb["lb_stat"].iloc[0]),
+            ljung_box_pvalue=float(lb["lb_pvalue"].iloc[0]),
+            lags=lags,
+        )

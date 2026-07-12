@@ -11,7 +11,39 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-import statsmodels.api as sm
+
+_SAMPLE_PATH = Path(__file__).resolve().parents[2] / "data" / "co2_sample.csv"
+
+
+def load_co2_sample(path: str | Path | None = None) -> pd.Series:
+    """Load the committed monthly CO2 sample CSV, no network or statsmodels data needed.
+
+    This is the offline default for the CLI and the demo. The file ships in the
+    repository at ``data/co2_sample.csv`` and holds the full monthly Mauna Loa
+    series carved from the public statsmodels ``co2`` dataset (public NOAA data).
+
+    Args:
+        path: Optional override path to a two-column ``date,co2`` CSV. Defaults
+            to the bundled ``data/co2_sample.csv``.
+
+    Returns:
+        Monthly CO2 concentration (ppm) as a pandas Series with a monthly
+        ``DatetimeIndex`` and name ``"co2"``.
+
+    Raises:
+        FileNotFoundError: If the sample CSV cannot be found.
+    """
+    csv_path = Path(path) if path is not None else _SAMPLE_PATH
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"{csv_path} not found. It ships with the repo; "
+            "regenerate it with scripts/make_sample.py."
+        )
+    frame = pd.read_csv(csv_path, parse_dates=["date"])
+    series = pd.Series(frame["co2"].to_numpy(dtype=float), index=frame["date"])
+    series.index = pd.DatetimeIndex(series.index, freq="MS")
+    series.name = "co2"
+    return series
 
 
 def load_co2_monthly() -> pd.Series:
@@ -25,6 +57,8 @@ def load_co2_monthly() -> pd.Series:
         Monthly CO2 concentration (ppm) as a pandas Series with a monthly
         ``DatetimeIndex`` and name ``"co2"``.
     """
+    import statsmodels.api as sm
+
     raw = sm.datasets.co2.load_pandas().data["co2"]
     monthly = raw.resample("MS").mean().interpolate(method="linear")
     monthly.name = "co2"
