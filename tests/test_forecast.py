@@ -4,9 +4,9 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from tsforecast.data import load_co2_monthly, load_fred_csv
+from tsforecast.data import load_co2_monthly, load_co2_sample, load_fred_csv
 from tsforecast.decompose import decompose
-from tsforecast.forecast import SarimaxForecaster
+from tsforecast.forecast import ResidualDiagnostics, SarimaxForecaster
 
 
 @pytest.fixture(scope="module")
@@ -53,6 +53,40 @@ class TestSarimaxForecaster:
             model.forecast(steps=0)
 
 
+class TestResidualDiagnostics:
+    def test_returns_residual_diagnostics_instance(self, trend_series: pd.Series) -> None:
+        model = SarimaxForecaster(order=(1, 1, 0)).fit(trend_series)
+        diag = model.residual_diagnostics(lags=6)
+        assert isinstance(diag, ResidualDiagnostics)
+        assert diag.lags == 6
+
+    def test_mean_near_zero_and_std_positive(self, trend_series: pd.Series) -> None:
+        model = SarimaxForecaster(order=(1, 1, 0), trend="c").fit(trend_series)
+        diag = model.residual_diagnostics()
+        assert abs(diag.mean) < 1.0  # residuals of a good fit centre near zero
+        assert diag.std > 0.0
+
+    def test_white_noise_residuals_pass_the_test(self) -> None:
+        # A series that is genuine white noise should not show autocorrelation.
+        rng = np.random.default_rng(0)
+        index = pd.date_range("2005-01-01", periods=120, freq="MS")
+        noise = pd.Series(rng.normal(0, 1, 120), index=index)
+        model = SarimaxForecaster(order=(0, 0, 0)).fit(noise)
+        diag = model.residual_diagnostics(lags=10)
+        assert diag.is_white_noise()
+        assert diag.ljung_box_pvalue > 0.05
+
+    def test_pvalue_and_stat_are_finite(self, trend_series: pd.Series) -> None:
+        model = SarimaxForecaster(order=(1, 1, 0)).fit(trend_series)
+        diag = model.residual_diagnostics(lags=8)
+        assert np.isfinite(diag.ljung_box_stat)
+        assert 0.0 <= diag.ljung_box_pvalue <= 1.0
+
+    def test_diagnostics_before_fit_raises(self) -> None:
+        with pytest.raises(RuntimeError, match="fit"):
+            SarimaxForecaster().residual_diagnostics()
+
+
 @pytest.fixture(scope="module")
 def seasonal_series() -> pd.Series:
     index = pd.date_range("2000-01-01", periods=72, freq="MS")
@@ -83,6 +117,27 @@ class TestDecompose:
 
 
 class TestData:
+    def test_co2_sample_loads_offline_and_is_regular(self) -> None:
+        series = load_co2_sample()
+        assert len(series) > 400
+        assert series.name == "co2"
+        assert series.isna().sum() == 0
+        assert pd.infer_freq(series.index) == "MS"
+        assert series.min() > 300  # ppm, sanity bounds
+        assert series.max() < 400
+
+    def test_co2_sample_missing_file_raises(self, tmp_path) -> None:
+        with pytest.raises(FileNotFoundError, match="make_sample"):
+            load_co2_sample(tmp_path / "absent.csv")
+
+    def test_co2_sample_matches_custom_csv(self, tmp_path) -> None:
+        csv = tmp_path / "mini.csv"
+        csv.write_text("date,co2\n2010-01-01,380.0\n2010-02-01,381.5\n2010-03-01,382.0\n")
+        series = load_co2_sample(csv)
+        assert len(series) == 3
+        assert series.iloc[1] == 381.5
+        assert pd.infer_freq(series.index) == "MS"
+
     def test_co2_monthly_is_regular_and_complete(self) -> None:
         series = load_co2_monthly()
         assert len(series) > 400
