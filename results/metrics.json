@@ -1,0 +1,14 @@
+{
+  "model": "SARIMAX(1, 1, 1)x(1, 1, 1, 12)",
+  "series": "co2_monthly_sample",
+  "n_observations": 526,
+  "initial_train_size": 466,
+  "holdout_months": 60,
+  "horizon": 12,
+  "step": 12,
+  "n_folds": 5,
+  "n_scored_points": 60,
+  "rmse": 0.656,
+  "mae": 0.5065,
+  "mape_percent": 0.138
+}

@@ -10,12 +10,18 @@ __pycache__/
 build/
 dist/
 
-# data: keep only the README
+# data: keep only the README and the committed offline sample
 data/*
 !data/README.md
+!data/co2_sample.csv
 
-# outputs
-results/
+# outputs: ignore results by default, but keep the committed demo artifacts
+results/*
+!results/forecast.png
+!results/decomposition.png
+!results/residual_diagnostics.png
+!results/forecast.csv
+!results/metrics.json
 
 # tooling
 .pytest_cache/
