@@ -1,7 +1,5 @@
 # time-series-forecasting
 
-*Origin: Originally developed for the Data Analysis (MITx 6.419x) online course; refactored and open-sourced in July 2026.*
-
 ![CO2 forecast with 95 percent prediction interval](results/forecast.png)
 
 SARIMAX(1,1,1)x(1,1,1,12) forecasting the last 24 months of the Mauna Loa CO2
@@ -162,3 +160,7 @@ Aamir Malik
 ## License
 
 MIT, see [LICENSE](LICENSE).
+
+---
+
+*Refactored and engineered into this tested, reproducible project in July 2026, reimplemented from scratch on public data. The underlying methods were first studied in the Data Analysis (MITx 6.419x) course.*
